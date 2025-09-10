@@ -2,9 +2,11 @@ package cache
 
 import (
 	"context"
-	"go-api-starter/core/logger"
+	"errors"
 	"sync"
 	"time"
+	"go-api-starter/core/logger"
+	"go-api-starter/core/utils"
 
 	"go-api-starter/core/constants"
 
@@ -79,6 +81,14 @@ func (c *Cache) Close() error {
 	return c.client.Close()
 }
 
+func (c *Cache) GetOTP(ctx context.Context, key string) (string, error) {
+	return c.client.Get(ctx, key).Result()
+}
+
+func (c *Cache) SetOTP(ctx context.Context, key string, value string) error {
+	return c.client.Set(ctx, key, value, constants.DefaultOTPExpiration).Err()
+}
+
 func (c *Cache) IsLoginBlocked(ctx context.Context, key string) (bool, error) {
 	count, err := c.client.Get(ctx, key).Int()
 	if err != nil && err != redis.Nil {
@@ -105,4 +115,63 @@ func (c *Cache) IncrementLoginAttempt(ctx context.Context, key string) error {
 		}
 	}
 	return nil
+}
+
+func (c *Cache) ClearLoginAttempt(ctx context.Context, key string) error {
+	return c.client.Del(ctx, key).Err()
+}
+
+func (c *Cache) AddToTokenBlacklist(ctx context.Context, token string) error {
+	tokenData, err := utils.ValidateAndParseToken(token)
+	if err != nil {
+		return err
+	}
+
+	jti := tokenData.RegisteredClaims.ID
+	if jti == "" {
+		return errors.New("token missing jti")
+	}
+
+	if tokenData.RegisteredClaims.ExpiresAt == nil {
+		return errors.New("token missing exp")
+	}
+
+	ttl := time.Until(tokenData.RegisteredClaims.ExpiresAt.Time)
+	if ttl <= 0 {
+		return errors.New("token already expired")
+	}
+
+	// Lưu jti vào Redis với TTL, value chỉ cần "1"
+	return c.client.SetEx(ctx, constants.TokenBlacklistKey+jti, 1, ttl).Err()
+}
+
+func (c *Cache) IsTokenBlacklisted(ctx context.Context, token string) (bool, error) {
+	parsedToken, err := utils.ValidateAndParseToken(token)
+	if err != nil {
+		return false, err
+	}
+
+	jti := parsedToken.RegisteredClaims.ID
+	if jti == "" {
+		return false, errors.New("token missing jti")
+	}
+
+	exists, err := c.client.Exists(ctx, constants.TokenBlacklistKey+jti).Result()
+	if err != nil {
+		return false, err
+	}
+
+	return exists == 1, nil
+}
+
+// ClearTokenBlacklist xóa toàn bộ blacklist
+func (c *Cache) ClearTokenBlacklist(ctx context.Context) error {
+	keys, err := c.client.Keys(ctx, "blacklist:*").Result()
+	if err != nil {
+		return err
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	return c.client.Del(ctx, keys...).Err()
 }

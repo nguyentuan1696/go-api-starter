@@ -60,3 +60,61 @@ func ToNumberWithDefault(s string, defaultValue int) int {
 func ToString(s uuid.UUID) string {
 	return s.String()
 }
+
+func ToUUID(s string) uuid.UUID {
+	return uuid.MustParse(s)
+}
+
+// IdentifierType represents the type of identifier
+type IdentifierType string
+
+const (
+	IdentifierTypeEmail    IdentifierType = "email"
+	IdentifierTypePhone    IdentifierType = "phone"
+	IdentifierTypeUsername IdentifierType = "username"
+	IdentifierTypeUnknown  IdentifierType = "unknown"
+)
+
+// DetectIdentifierType determines if the input string is an email, phone number, or username
+func DetectIdentifierType(identifier string) IdentifierType {
+	// Trim spaces first
+	identifier = TrimSpace(identifier)
+	
+	// Check if empty
+	if IsEmpty(identifier) {
+		return IdentifierTypeUnknown
+	}
+	
+	// Check if it's a valid email
+	if IsValidEmail(identifier) {
+		return IdentifierTypeEmail
+	}
+	
+	// Check if it's a valid phone number
+	if IsValidPhone(identifier) {
+		return IdentifierTypePhone
+	}
+	
+	// If it's neither email nor phone, consider it as username
+	// You can add additional username validation rules here if needed
+	if len(identifier) >= 3 && len(identifier) <= 50 {
+		return IdentifierTypeUsername
+	}
+	
+	return IdentifierTypeUnknown
+}
+
+// IsEmail checks if the identifier is an email
+func IsEmail(identifier string) bool {
+	return DetectIdentifierType(identifier) == IdentifierTypeEmail
+}
+
+// IsPhone checks if the identifier is a phone number
+func IsPhone(identifier string) bool {
+	return DetectIdentifierType(identifier) == IdentifierTypePhone
+}
+
+// IsUsername checks if the identifier is a username
+func IsUsername(identifier string) bool {
+	return DetectIdentifierType(identifier) == IdentifierTypeUsername
+}

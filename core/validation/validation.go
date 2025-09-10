@@ -6,7 +6,7 @@ type ValidationError struct {
 }
 
 type ValidationResult struct {
-	Valid  bool              `json:"valid"`
+	Valid  bool              `json:"-"`
 	Errors []ValidationError `json:"errors,omitempty"`
 }
 
@@ -23,4 +23,8 @@ func (v *ValidationResult) AddError(field, message string) {
 		Field:   field,
 		Message: message,
 	})
+}
+
+func (v *ValidationResult) HasError() bool {
+	return !v.Valid
 }

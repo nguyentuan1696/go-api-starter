@@ -1,11 +1,11 @@
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: thichlab_postgres
+    container_name: tinupvn_postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: thichlab_dev
+      POSTGRES_DB: tinupvn
     ports:
       - "5439:5432"
     volumes:
@@ -18,7 +18,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: thichlab_redis
+    container_name: tinupvn_redis
     ports:
       - "6379:6379"
     volumes:
