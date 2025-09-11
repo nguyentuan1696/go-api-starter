@@ -4,10 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 	"go-api-starter/core/cache"
 	"go-api-starter/core/config"
 	"go-api-starter/core/database"
@@ -18,6 +14,11 @@ import (
 	"go-api-starter/modules/auth"
 	"go-api-starter/modules/product"
 	"go-api-starter/modules/storage"
+	"go-api-starter/workers"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/labstack/echo/v4"
 )
@@ -136,6 +137,9 @@ func initServer() (*Server, error) {
 	product.Init(e, db, *redisCache)
 	storage.Init(e, db, r2Client, *redisCache)
 	auth.Init(e, db, *redisCache)
+
+	// Initialize Asynq worker server
+	workers.NewServer()
 
 	return &Server{
 		echo:  e,
