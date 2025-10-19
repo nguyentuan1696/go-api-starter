@@ -95,7 +95,7 @@ func (m *Middleware) PermissionMiddleware(requiredPermissions ...string) echo.Mi
 			}
 
 
-
+			// TODO: Tối ưu O(1) với map[string]bool
 			// Kiểm tra xem user có ít nhất một trong các permissions được yêu cầu không
 			for _, requiredPerm := range requiredPermissions {
 				for _, userPerm := range *userPermissions {
