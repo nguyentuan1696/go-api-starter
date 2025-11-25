@@ -94,16 +94,15 @@ func (m *Middleware) PermissionMiddleware(requiredPermissions ...string) echo.Mi
 				return m.Unauthorized(errors.ErrInternalServer, "internal server error")
 			}
 
+			
+			requiredSet := make(map[string]struct{}, len(requiredPermissions))
+			for _, rp := range requiredPermissions {
+				requiredSet[rp] = struct{}{}
+			}
 
-			// TODO: Tối ưu O(1) với map[string]bool
-			// Kiểm tra xem user có ít nhất một trong các permissions được yêu cầu không
-			for _, requiredPerm := range requiredPermissions {
-				for _, userPerm := range *userPermissions {
-					// Kiểm tra theo định dạng "resource:action" (ví dụ: "user:update")
-					permissionString := userPerm.Resource + ":" + string(userPerm.Action)
-					if permissionString == requiredPerm {
-						return next(c)
-					}
+			for _, up := range *userPermissions {
+				if _, ok := requiredSet[up.Resource+":"+string(up.Action)]; ok {
+					return next(c)
 				}
 			}
 
