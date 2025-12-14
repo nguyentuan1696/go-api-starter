@@ -77,7 +77,7 @@ func initServer() (*Server, error) {
 	}
 
 	// Initialize database
-	db, err := database.InitDB(database.DatabaseConfig{
+	db, err := database.InitDB(database.Config{
 		Host:     cfg.Database.Host,
 		Port:     cfg.Database.Port,
 		User:     cfg.Database.User,

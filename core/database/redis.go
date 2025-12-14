@@ -2,49 +2,45 @@ package database
 
 import (
 	"context"
-	"sync"
+	"github.com/samber/do/v2"
+	"go-api-starter/core/config"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
-type Icache interface {
+type ICache interface {
 	Set(ctx context.Context, key string, value any, expiration time.Duration) error
 	Get(ctx context.Context, key string, value any) error
 	Del(ctx context.Context, key string) error
 }
 
-type Cache struct {
-	Client *redis.Client
+type Redis struct {
+	RedisClient *redis.Client
 }
 
-// Singleton variables
-var (
-	cacheInstance *Cache
-	cacheOnce     sync.Once
-)
+// NewRedis creates a new Cache instance (deprecated, use GetCacheInstance instead)
+func NewRedis(injector do.Injector) *Redis {
+	appConfig := do.MustInvoke[*config.Config](injector)
+	cfg := appConfig.Redis
 
-// GetCacheInstance returns the singleton instance of Cache
-func GetCacheInstance(client *redis.Client) *Cache {
-	cacheOnce.Do(func() {
-		cacheInstance = &Cache{Client: client}
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     cfg.Address,
+		Password: cfg.Password,
+		DB:       cfg.DB,
 	})
-	return cacheInstance
+
+	return &Redis{RedisClient: rdb}
 }
 
-// NewCache creates a new Cache instance (deprecated, use GetCacheInstance instead)
-func NewCache(client *redis.Client) *Cache {
-	return &Cache{Client: client}
+func (r *Redis) Set(ctx context.Context, key string, value any, expiration time.Duration) error {
+	return r.RedisClient.Set(ctx, key, value, expiration).Err()
 }
 
-func (c *Cache) Set(ctx context.Context, key string, value any, expiration time.Duration) error {
-	return c.Client.Set(ctx, key, value, expiration).Err()
+func (r *Redis) Get(ctx context.Context, key string, value any) error {
+	return r.RedisClient.Get(ctx, key).Scan(value)
 }
 
-func (c *Cache) Get(ctx context.Context, key string, value any) error {
-	return c.Client.Get(ctx, key).Scan(value)
-}
-
-func (c *Cache) Del(ctx context.Context, key string) error {
-	return c.Client.Del(ctx, key).Err()
+func (r *Redis) Del(ctx context.Context, key string) error {
+	return r.RedisClient.Del(ctx, key).Err()
 }

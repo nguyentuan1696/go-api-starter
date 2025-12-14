@@ -1,0 +1,22 @@
+server:
+  port: 8080
+  host: "0.0.0.0"
+  base_url: "http://localhost:8080"
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "yourpassword"
+  dbname: "yourdb"
+  ssl_mode: "",
+  max_open_conns: 20,
+
+
+jwt:
+  secret: "your_jwt_secret_here"
+
+redis:
+  address: "localhost:6379"
+  password: ""
+  db: 0

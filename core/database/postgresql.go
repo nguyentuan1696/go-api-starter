@@ -4,13 +4,67 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
-	"go-api-starter/core/constants"
-	"go-api-starter/core/logger"
-
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/samber/do/v2"
+	"go-api-starter/core/config"
+	"go-api-starter/core/logger"
+	"time"
 )
+
+type Database struct {
+	db   *sql.DB
+	sqlx *sqlx.DB
+}
+
+type Config struct {
+	Host                   string
+	Port                   int
+	User                   string
+	Password               string
+	Database               string
+	MaxOpenConns           int
+	MaxIdleConns           int
+	ConnMaxLifetime        int    // in minutes
+	SSLMode                string // disable, require, verify-ca, verify-full
+	ConnectTimeout         int    // in seconds
+	StatementTimeout       int    // in seconds
+	IdleInTxSessionTimeout int    // in seconds
+}
+
+func NewDatabase(injector do.Injector) (*Database, error) {
+	// Get configuration from the injector
+	appConfig := do.MustInvoke[*config.Config](injector)
+	cfg := appConfig.Database
+
+	dsn := fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s pool_max_conns=%d pool_min_conns=%d pool_max_conn_lifetime=%s",
+		cfg.Host,
+		cfg.Port,
+		cfg.User,
+		cfg.Password,
+		cfg.Database,
+		cfg.SSLMode,
+		cfg.MaxOpenConns,
+		cfg.MaxIdleConns,
+		time.Duration(cfg.ConnMaxLifetime)*time.Second,
+	)
+
+	db, err := sqlx.Connect("postgres", dsn)
+	if err != nil {
+		logger.Error("Failed to connect to database", "error", err)
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	defer db.Close()
+
+	if err = db.Ping(); err != nil {
+		logger.Error("Failed to ping database", "error", err)
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	return &Database{db: db.DB}, nil
+}
 
 type IDatabase interface {
 	ExecContext(ctx context.Context, query string, args ...any) error
@@ -21,72 +75,6 @@ type IDatabase interface {
 	NamedQueryContext(ctx context.Context, query string, arg any) (*sqlx.Rows, error)
 	NamedExecContext(ctx context.Context, query string, arg any) (sql.Result, error)
 	SQLx() *sqlx.DB
-}
-
-type Database struct {
-	db   *sql.DB
-	sqlx *sqlx.DB
-}
-
-type DatabaseConfig struct {
-	Host                   string
-	Port                   int
-	User                   string
-	Password               string
-	DBName                 string
-	MaxOpenConns           int
-	MaxIdleConns           int
-	ConnMaxLifetime        int    // in minutes
-	SSLMode                string // disable, require, verify-ca, verify-full
-	ConnectTimeout         int    // in seconds
-	StatementTimeout       int    // in seconds
-	IdleInTxSessionTimeout int    // in seconds
-}
-
-var (
-	instance *Database
-)
-
-func GetDB() IDatabase {
-	return instance
-}
-
-func InitDB(config DatabaseConfig) (Database, error) {
-	logger.Info("Initializing database...")
-	var db Database
-	var err error
-
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		config.Host, config.Port, config.User, config.Password, config.DBName, constants.DatabaseSSLMode)
-
-	sqlxDB, err := sqlx.Connect("postgres", dsn)
-	if err != nil {
-		logger.Error("Failed to connect to database", "error", err)
-		return Database{}, fmt.Errorf("failed to connect to database: %w", err)
-	}
-
-	sqlDB := sqlxDB.DB
-	sqlDB.SetMaxOpenConns(constants.DatabaseMaxOpenConns)
-	sqlDB.SetMaxIdleConns(constants.DatabaseMaxIdleConns)
-	sqlDB.SetConnMaxLifetime(time.Duration(constants.DatabaseConnMaxLifetime) * time.Minute)
-
-	if err = sqlDB.Ping(); err != nil {
-		logger.Error("Failed to ping database", "error", err)
-		return Database{}, fmt.Errorf("failed to ping database: %w", err)
-	}
-
-	db = Database{
-		db:   sqlDB,
-		sqlx: sqlxDB,
-	}
-
-	logger.Info("Database initialized successfully",
-		"maxOpenConns", constants.DatabaseMaxOpenConns,
-		"maxIdleConns", constants.DatabaseMaxIdleConns,
-		"connMaxLifetime", constants.DatabaseConnMaxLifetime,
-	)
-
-	return db, nil
 }
 
 func (d *Database) ExecContext(ctx context.Context, query string, args ...any) error {
