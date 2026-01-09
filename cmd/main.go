@@ -1,7 +1,7 @@
 package main
 
 import (
-	"go-api-starter/modules/auth"
+	"go-api-starter/modules"
 	"go-api-starter/pkg"
 	"go-api-starter/pkg/cli"
 	"go-api-starter/pkg/config"
@@ -16,7 +16,7 @@ func main() {
 	injector := do.New(
 		pkg.BasePackage,
 		server.Package,
-		auth.Package,
+		modules.BasePackage,
 	)
 	defer injector.Shutdown()
 
