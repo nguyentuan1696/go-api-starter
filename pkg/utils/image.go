@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"go-api-starter/core/constants"
 	"mime/multipart"
 	"strings"
 
@@ -18,7 +17,7 @@ const (
 )
 
 func IsValidImageType(contentType string) bool {
-	allowedTypes := strings.Split(constants.UploadAllowedTypes, ",")
+	allowedTypes := strings.Split(UploadAllowedTypes, ",")
 
 	for _, allowedType := range allowedTypes {
 		if strings.TrimSpace(allowedType) == contentType {
@@ -36,7 +35,7 @@ func ValidateFileSize(fileSize int64, maxSizeBytes int64) bool {
 
 // GetMaxFileSizeBytes trả về kích thước tối đa tính bằng bytes từ constants
 func GetMaxFileSizeBytes() int64 {
-	return int64(constants.UploadMaxSize)
+	return int64(UploadMaxSize)
 }
 
 func GetExtensionFromContentType(contentType string) string {
@@ -75,7 +74,7 @@ func ValidateUploadFile(fileHeader *multipart.FileHeader) error {
 	}
 
 	if !IsValidImageType(contentType) {
-		return fmt.Errorf("invalid image type. Allowed: %s", constants.UploadAllowedTypes)
+		return fmt.Errorf("invalid image type. Allowed: %s", UploadAllowedTypes)
 	}
 
 	// Check file size using constants

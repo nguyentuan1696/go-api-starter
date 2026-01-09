@@ -4,9 +4,10 @@ import (
 	"io"
 	"os"
 
+	"go-api-starter/pkg/config"
+
 	"github.com/rs/zerolog"
 	"github.com/samber/do/v2"
-	"go-api-starter/core/config"
 )
 
 // Config holds the logger configuration.

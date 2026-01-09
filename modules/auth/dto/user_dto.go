@@ -1,15 +1,15 @@
 package dto
 
 import (
+	"go-api-starter/pkg/dto"
 	"time"
-	"go-api-starter/core/dto"
 
 	"github.com/google/uuid"
 )
 
 type RegisterRequest struct {
-	Phone    string `json:"phone"`
-	Password string `json:"password"`
+	Identifier string `json:"identifier"` // phone, username, email
+	Password   string `json:"password"`
 }
 
 type RegisterResponse struct {

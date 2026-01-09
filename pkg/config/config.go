@@ -9,17 +9,15 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Config holds all application configuration
-// This struct demonstrates how to structure configuration for dependency injection.
 type Config struct {
-	App        AppConfig        `mapstructure:"app"`
-	Server     ServerConfig     `mapstructure:"http"`
-	Postgresql PostgresqlConfig `mapstructure:"postgresql"`
+	Server     ServerConfig     `mapstructure:"server"`
 	Redis      RedisConfig      `mapstructure:"redis"`
+	Postgresql PostgresqlConfig `mapstructure:"postgresql"`
 	Logger     LoggerConfig     `mapstructure:"logger"`
+	App        AppConfig        `mapstructure:"app"`
+	Minio      MinioConfig      `mapstructure:"minio"`
 }
 
-// ServerConfig holds HTTP http configuration.
 type ServerConfig struct {
 	Host         string `mapstructure:"host"`
 	Port         int    `mapstructure:"port"`
@@ -27,7 +25,13 @@ type ServerConfig struct {
 	WriteTimeout int    `mapstructure:"write_timeout"`
 }
 
-// DatabaseConfig holds PostgreSQL configuration.
+type RedisConfig struct {
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Password string `mapstructure:"password"`
+	DB       int    `mapstructure:"db"`
+}
+
 type PostgresqlConfig struct {
 	Host            string `mapstructure:"host"`
 	Port            int    `mapstructure:"port"`
@@ -40,13 +44,6 @@ type PostgresqlConfig struct {
 	ConnMaxLifetime int    `mapstructure:"conn_max_lifetime"`
 }
 
-type RedisConfig struct {
-	Address  string `mapstructure:"host"`
-	Password string `mapstructure:"password"`
-	DB       int    `mapstructure:"db"`
-}
-
-// LoggerConfig holds logger configuration.
 type LoggerConfig struct {
 	Level   string `mapstructure:"level"`
 	Format  string `mapstructure:"format"`
@@ -54,7 +51,6 @@ type LoggerConfig struct {
 	NoColor bool   `mapstructure:"no_color"`
 }
 
-// AppConfig holds application-specific configuration.
 type AppConfig struct {
 	Name        string `mapstructure:"name"`
 	Version     string `mapstructure:"version"`
@@ -62,12 +58,30 @@ type AppConfig struct {
 	Debug       bool   `mapstructure:"debug"`
 }
 
-// NewConfig creates a new configuration instance using viper
-// This demonstrates configuration management with the samber/do library.
+type MinioConfig struct {
+	Endpoint        string `mapstructure:"endpoint"`
+	AccessKeyID     string `mapstructure:"access_key_id"`
+	SecretAccessKey string `mapstructure:"secret_access_key"`
+	UseSSL          bool   `mapstructure:"use_ssl"`
+}
+
 func NewConfig(i do.Injector) (*Config, error) {
 	// Enable environment variable support
 	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "."))
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// Set config file
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+
+	// Read config file
+	if err := viper.ReadInConfig(); err != nil {
+		// It's okay if config file doesn't exist, we fallback to flags/env
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, fmt.Errorf("error reading config file: %w", err)
+		}
+	}
 
 	// Unmarshal configuration into struct
 	var config Config
@@ -78,25 +92,29 @@ func NewConfig(i do.Injector) (*Config, error) {
 	return &config, nil
 }
 
-// SetCobraFlags adds command line flags to the cobra command
-// This method demonstrates how services can provide functionality through DI.
 func (cs *Config) SetCobraFlags(cmd *cobra.Command) {
 	// Server flags
-	_ = cmd.PersistentFlags().String("http.host", "localhost", "Server host")
-	_ = cmd.PersistentFlags().Int("http.port", 8080, "Server port")
-	_ = cmd.PersistentFlags().Int("http.read_timeout", 30, "Server read timeout in seconds")
-	_ = cmd.PersistentFlags().Int("http.write_timeout", 30, "Server write timeout in seconds")
+	_ = cmd.PersistentFlags().String("server.host", "localhost", "Server host")
+	_ = cmd.PersistentFlags().Int("server.port", 8080, "Server port")
+	_ = cmd.PersistentFlags().Int("server.read_timeout", 30, "Server read timeout in seconds")
+	_ = cmd.PersistentFlags().Int("server.write_timeout", 30, "Server write timeout in seconds")
+
+	// Redis flags
+	_ = cmd.PersistentFlags().String("redis.host", "localhost", "Redis host")
+	_ = cmd.PersistentFlags().Int("redis.port", 6379, "Redis port")
+	_ = cmd.PersistentFlags().String("redis.password", "", "Redis password")
+	_ = cmd.PersistentFlags().Int("redis.db", 0, "Redis database")
 
 	// Database flags
-	_ = cmd.PersistentFlags().String("database.host", "localhost", "Database host")
-	_ = cmd.PersistentFlags().Int("database.port", 5432, "Database port")
-	_ = cmd.PersistentFlags().String("database.user", "postgres", "Database user")
-	_ = cmd.PersistentFlags().String("database.password", "postgres", "Database password")
-	_ = cmd.PersistentFlags().String("database.database", "do_template_api", "Database name")
-	_ = cmd.PersistentFlags().String("database.ssl_mode", "disable", "Database SSL mode")
-	_ = cmd.PersistentFlags().Int("database.max_open_conns", 25, "Database max open connections")
-	_ = cmd.PersistentFlags().Int("database.max_idle_conns", 25, "Database max idle connections")
-	_ = cmd.PersistentFlags().Int("database.conn_max_lifetime", 300, "Database connection max lifetime in seconds")
+	_ = cmd.PersistentFlags().String("postgresql.host", "localhost", "Database host")
+	_ = cmd.PersistentFlags().Int("postgresql.port", 5432, "Database port")
+	_ = cmd.PersistentFlags().String("postgresql.user", "postgres", "Database user")
+	_ = cmd.PersistentFlags().String("postgresql.password", "postgres", "Database password")
+	_ = cmd.PersistentFlags().String("postgresql.database", "do_template_api", "Database name")
+	_ = cmd.PersistentFlags().String("postgresql.ssl_mode", "disable", "Database SSL mode")
+	_ = cmd.PersistentFlags().Int("postgresql.max_open_conns", 25, "Database max open connections")
+	_ = cmd.PersistentFlags().Int("postgresql.max_idle_conns", 25, "Database max idle connections")
+	_ = cmd.PersistentFlags().Int("postgresql.conn_max_lifetime", 300, "Database connection max lifetime in seconds")
 
 	// Logger flags
 	_ = cmd.PersistentFlags().String("logger.level", "info", "Log level")
@@ -110,6 +128,12 @@ func (cs *Config) SetCobraFlags(cmd *cobra.Command) {
 	_ = cmd.PersistentFlags().String("app.environment", "development", "Application environment")
 	_ = cmd.PersistentFlags().Bool("app.debug", false, "Debug mode")
 
+	// Minio flags
+	_ = cmd.PersistentFlags().String("minio.endpoint", "localhost", "Minio endpoint")
+	_ = cmd.PersistentFlags().String("minio.access_key_id", "minioadmin", "Minio access key ID")
+	_ = cmd.PersistentFlags().String("minio.secret_access_key", "minioadmin", "Minio secret access key")
+	_ = cmd.PersistentFlags().Bool("minio.use_ssl", false, "Minio use SSL")
+
 	// Bind all flags to viper for automatic configuration
 	cs.bindFlagsToViper(cmd)
 }
@@ -117,21 +141,27 @@ func (cs *Config) SetCobraFlags(cmd *cobra.Command) {
 // bindFlagsToViper binds all cobra flags to viper.
 func (cs *Config) bindFlagsToViper(cmd *cobra.Command) {
 	// Server flags
-	_ = viper.BindPFlag("http.host", cmd.PersistentFlags().Lookup("http.host"))
-	_ = viper.BindPFlag("http.port", cmd.PersistentFlags().Lookup("http.port"))
-	_ = viper.BindPFlag("http.read_timeout", cmd.PersistentFlags().Lookup("http.read_timeout"))
-	_ = viper.BindPFlag("http.write_timeout", cmd.PersistentFlags().Lookup("http.write_timeout"))
+	_ = viper.BindPFlag("server.host", cmd.PersistentFlags().Lookup("server.host"))
+	_ = viper.BindPFlag("server.port", cmd.PersistentFlags().Lookup("server.port"))
+	_ = viper.BindPFlag("server.read_timeout", cmd.PersistentFlags().Lookup("server.read_timeout"))
+	_ = viper.BindPFlag("server.write_timeout", cmd.PersistentFlags().Lookup("server.write_timeout"))
+
+	// Redis flags
+	_ = viper.BindPFlag("redis.host", cmd.PersistentFlags().Lookup("redis.host"))
+	_ = viper.BindPFlag("redis.port", cmd.PersistentFlags().Lookup("redis.port"))
+	_ = viper.BindPFlag("redis.password", cmd.PersistentFlags().Lookup("redis.password"))
+	_ = viper.BindPFlag("redis.db", cmd.PersistentFlags().Lookup("redis.db"))
 
 	// Database flags
-	_ = viper.BindPFlag("database.host", cmd.PersistentFlags().Lookup("database.host"))
-	_ = viper.BindPFlag("database.port", cmd.PersistentFlags().Lookup("database.port"))
-	_ = viper.BindPFlag("database.user", cmd.PersistentFlags().Lookup("database.user"))
-	_ = viper.BindPFlag("database.password", cmd.PersistentFlags().Lookup("database.password"))
-	_ = viper.BindPFlag("database.database", cmd.PersistentFlags().Lookup("database.database"))
-	_ = viper.BindPFlag("database.ssl_mode", cmd.PersistentFlags().Lookup("database.ssl_mode"))
-	_ = viper.BindPFlag("database.max_open_conns", cmd.PersistentFlags().Lookup("database.max_open_conns"))
-	_ = viper.BindPFlag("database.max_idle_conns", cmd.PersistentFlags().Lookup("database.max_idle_conns"))
-	_ = viper.BindPFlag("database.conn_max_lifetime", cmd.PersistentFlags().Lookup("database.conn_max_lifetime"))
+	_ = viper.BindPFlag("postgresql.host", cmd.PersistentFlags().Lookup("postgresql.host"))
+	_ = viper.BindPFlag("postgresql.port", cmd.PersistentFlags().Lookup("postgresql.port"))
+	_ = viper.BindPFlag("postgresql.user", cmd.PersistentFlags().Lookup("postgresql.user"))
+	_ = viper.BindPFlag("postgresql.password", cmd.PersistentFlags().Lookup("postgresql.password"))
+	_ = viper.BindPFlag("postgresql.database", cmd.PersistentFlags().Lookup("postgresql.database"))
+	_ = viper.BindPFlag("postgresql.ssl_mode", cmd.PersistentFlags().Lookup("postgresql.ssl_mode"))
+	_ = viper.BindPFlag("postgresql.max_open_conns", cmd.PersistentFlags().Lookup("postgresql.max_open_conns"))
+	_ = viper.BindPFlag("postgresql.max_idle_conns", cmd.PersistentFlags().Lookup("postgresql.max_idle_conns"))
+	_ = viper.BindPFlag("postgresql.conn_max_lifetime", cmd.PersistentFlags().Lookup("postgresql.conn_max_lifetime"))
 
 	// Logger flags
 	_ = viper.BindPFlag("logger.level", cmd.PersistentFlags().Lookup("logger.level"))
@@ -144,4 +174,10 @@ func (cs *Config) bindFlagsToViper(cmd *cobra.Command) {
 	_ = viper.BindPFlag("app.version", cmd.PersistentFlags().Lookup("app.version"))
 	_ = viper.BindPFlag("app.environment", cmd.PersistentFlags().Lookup("app.environment"))
 	_ = viper.BindPFlag("app.debug", cmd.PersistentFlags().Lookup("app.debug"))
+
+	// Minio flags
+	_ = viper.BindPFlag("minio.endpoint", cmd.PersistentFlags().Lookup("minio.endpoint"))
+	_ = viper.BindPFlag("minio.access_key_id", cmd.PersistentFlags().Lookup("minio.access_key_id"))
+	_ = viper.BindPFlag("minio.secret_access_key", cmd.PersistentFlags().Lookup("minio.secret_access_key"))
+	_ = viper.BindPFlag("minio.use_ssl", cmd.PersistentFlags().Lookup("minio.use_ssl"))
 }

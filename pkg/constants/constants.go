@@ -46,24 +46,6 @@ const (
 	DefaultZeroValue   = 0  // Giá trị số 0 mặc định
 )
 
-// OrderState constants
-const (
-	OrderStatePending   = "pending"
-	OrderStateConfirmed = "confirmed"
-	OrderStateShipped   = "shipped"
-	OrderStateDelivered = "delivered"
-	OrderStateCancelled = "cancelled"
-)
-
-// PaymentStatus constants
-const (
-	PaymentStatusPending   = "pending"
-	PaymentStatusPaid      = "paid"
-	PaymentStatusFailed    = "failed"
-	PaymentStatusRefunded  = "refunded"
-	PaymentStatusCancelled = "cancelled"
-)
-
 // Context Key constants
 const (
 	ContextTokenData = "token_data"

@@ -1,47 +1,24 @@
 package database
 
 import (
+	"go-api-starter/pkg/config"
 	"context"
-	"database/sql"
 	"fmt"
-	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
-	"github.com/samber/do/v2"
-	"go-api-starter/core/config"
-	"go-api-starter/core/logger"
 	"time"
-)
 
-const (
-	PostgresqlDriver = "postgres"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/samber/do/v2"
 )
 
 type Postgresql struct {
-	db   *sql.DB
-	sqlx *sqlx.DB
-}
-
-type Config struct {
-	Host                   string
-	Port                   int
-	User                   string
-	Password               string
-	Database               string
-	MaxOpenConns           int
-	MaxIdleConns           int
-	ConnMaxLifetime        int    // in minutes
-	SSLMode                string // disable, require, verify-ca, verify-full
-	ConnectTimeout         int    // in seconds
-	StatementTimeout       int    // in seconds
-	IdleInTxSessionTimeout int    // in seconds
+	pool *pgxpool.Pool
 }
 
 func NewPostgresql(injector do.Injector) (*Postgresql, error) {
-	// Get configuration from the injector
 	appConfig := do.MustInvoke[*config.Config](injector)
 	cfg := appConfig.Postgresql
 
-	dsn := fmt.Sprintf(
+	connString := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s pool_max_conns=%d pool_min_conns=%d pool_max_conn_lifetime=%s",
 		cfg.Host,
 		cfg.Port,
@@ -54,62 +31,45 @@ func NewPostgresql(injector do.Injector) (*Postgresql, error) {
 		time.Duration(cfg.ConnMaxLifetime)*time.Second,
 	)
 
-	db, err := sqlx.Connect(PostgresqlDriver, dsn)
+	poolConfig, err := pgxpool.ParseConfig(connString)
 	if err != nil {
-		logger.Error("Failed to connect to database", "error", err)
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+		return nil, fmt.Errorf("failed to parse database config: %w", err)
 	}
 
-	defer db.Close()
+	poolConfig.MaxConns = int32(cfg.MaxOpenConns)
+	poolConfig.MinConns = int32(cfg.MaxIdleConns)
+	poolConfig.MaxConnLifetime = time.Duration(cfg.ConnMaxLifetime) * time.Second
+	poolConfig.HealthCheckPeriod = 1 * time.Minute
+	poolConfig.MaxConnIdleTime = 5 * time.Minute
 
-	if err = db.Ping(); err != nil {
-		logger.Error("Failed to ping database", "error", err)
+	pool, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection pool: %w", err)
+	}
+
+	if err := pool.Ping(context.Background()); err != nil {
+		pool.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &Postgresql{db: db.DB}, nil
+	return &Postgresql{pool: pool}, nil
 }
 
-type IPostgresql interface {
-	ExecContext(ctx context.Context, query string, args ...any) error
-	GetContext(ctx context.Context, dest any, query string, args ...any) error
-	SelectContext(ctx context.Context, dest any, query string, args ...any) error
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	NamedQueryContext(ctx context.Context, query string, arg any) (*sqlx.Rows, error)
-	NamedExecContext(ctx context.Context, query string, arg any) (sql.Result, error)
-	SQLx() *sqlx.DB
+func (db *Postgresql) Pool() *pgxpool.Pool {
+	return db.pool
 }
 
-func (p *Postgresql) ExecContext(ctx context.Context, query string, args ...any) error {
-	_, err := p.sqlx.ExecContext(ctx, query, args...)
-	return err
+func (db *Postgresql) HealthCheckWithContext(ctx context.Context) error {
+	if err := db.pool.Ping(ctx); err != nil {
+		return fmt.Errorf("database health check failed: %w", err)
+	}
+	return nil
 }
 
-func (p *Postgresql) GetContext(ctx context.Context, dest any, query string, args ...any) error {
-	return p.sqlx.GetContext(ctx, dest, query, args...)
-}
+func (db *Postgresql) Shutdown(context.Context) error {
+	if db.pool != nil {
+		db.pool.Close()
+	}
 
-func (p *Postgresql) SelectContext(ctx context.Context, dest any, query string, args ...any) error {
-	return p.sqlx.SelectContext(ctx, dest, query, args...)
-}
-
-func (p *Postgresql) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
-	return p.db.QueryRowContext(ctx, query, args...)
-}
-
-func (p *Postgresql) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	return p.db.QueryContext(ctx, query, args...)
-}
-
-func (p *Postgresql) NamedQueryContext(ctx context.Context, query string, arg any) (*sqlx.Rows, error) {
-	return p.sqlx.NamedQueryContext(ctx, query, arg)
-}
-
-func (p *Postgresql) NamedExecContext(ctx context.Context, query string, arg any) (sql.Result, error) {
-	return p.sqlx.NamedExecContext(ctx, query, arg)
-}
-
-func (p *Postgresql) SQLx() *sqlx.DB {
-	return p.sqlx
+	return nil
 }

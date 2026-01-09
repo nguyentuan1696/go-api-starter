@@ -1,28 +1,26 @@
-package controller
+package handler
 
 import (
-	"go-api-starter/pkg/errors"
+	"go-api-starter/pkg/apperrors"
 	"net/http"
 	"time"
 
 	"github.com/labstack/echo/v4"
 )
 
-// Response types
 type (
 	SuccessResponse struct {
-		Status    int       `json:"status"`
 		Message   string    `json:"message"`
 		Data      any       `json:"data,omitempty"`
+		Meta      any       `json:"meta,omitempty"`
 		Timestamp time.Time `json:"timestamp"`
 	}
 
 	ErrorResponse struct {
-		Status    string           `json:"status"`
-		Code      errors.ErrorCode `json:"code"`
-		Message   string           `json:"message"`
-		Details   any              `json:"details,omitempty"`
-		Timestamp time.Time        `json:"timestamp"`
+		Code      apperrors.ErrorCode `json:"code"`
+		Message   string              `json:"message"`
+		Details   any                 `json:"details,omitempty"`
+		Timestamp time.Time           `json:"timestamp"`
 	}
 
 	ValidationError struct {
@@ -37,37 +35,30 @@ type (
 	}
 )
 
-// BaseHandler Response handler interface and implementation
 type BaseHandler interface {
-	BadRequest(appErrCode errors.ErrorCode, message string, details ...any) *echo.HTTPError
-	InternalServerError(appErrCode errors.ErrorCode, message string, details ...any) *echo.HTTPError
-	NotFound(appErrCode errors.ErrorCode, message string, details ...any) *echo.HTTPError
-	Unauthorized(appErrCode errors.ErrorCode, message string, details ...any) *echo.HTTPError
-	Forbidden(appErrCode errors.ErrorCode, message string, details ...any) *echo.HTTPError
-	SuccessResponse(c echo.Context, data any, message string) error
-	ErrorResponse(c echo.Context, err error) error
+	SuccessResponse(c echo.Context, data any, meta any, message string) error
+	BadRequest(appErrCode apperrors.ErrorCode, message string, details ...any) *echo.HTTPError
+	NotFound(appErrCode apperrors.ErrorCode, message string, details ...any) *echo.HTTPError
+	InternalServerError(appErrCode apperrors.ErrorCode, message string, details ...any) *echo.HTTPError
 }
 
-type responseHandler struct{}
+type baseHandler struct{}
 
-func NewBaseController() BaseHandler {
-	return &responseHandler{}
+func NewBaseHandler() BaseHandler {
+	return &baseHandler{}
 }
 
-// NewSuccessResponse Success response functions
-func NewSuccessResponse(httpStatusCode int, data any, message string) *SuccessResponse {
+func NewSuccessResponse(data any, meta any, message string) *SuccessResponse {
 	return &SuccessResponse{
-		Status:    httpStatusCode,
-		Message:   message,
 		Data:      data,
+		Meta:      meta,
+		Message:   message,
 		Timestamp: time.Now(),
 	}
 }
 
-// NewErrorResponse Error response functions
-func NewErrorResponse(httpStatusCode int, appErrCode errors.ErrorCode, message string, details ...any) *echo.HTTPError {
+func NewErrorResponse(httpStatusCode int, appErrCode apperrors.ErrorCode, message string, details ...any) *echo.HTTPError {
 	err := &ErrorResponse{
-		Status:    "error",
 		Code:      appErrCode,
 		Message:   message,
 		Timestamp: time.Now(),
@@ -78,43 +69,18 @@ func NewErrorResponse(httpStatusCode int, appErrCode errors.ErrorCode, message s
 	return echo.NewHTTPError(httpStatusCode, err)
 }
 
-// NewValidationError Validation functions
-func NewValidationError(field, message string) ValidationError {
-	return ValidationError{
-		Field:   field,
-		Message: message,
-	}
+func (h *baseHandler) SuccessResponse(c echo.Context, data any, meta any, message string) error {
+	return c.JSON(http.StatusOK, NewSuccessResponse(data, meta, message))
 }
 
-// HTTP Error handlers
-func (h *responseHandler) BadRequest(appErrCode errors.ErrorCode, message string, details ...any) *echo.HTTPError {
+func (h *baseHandler) BadRequest(appErrCode apperrors.ErrorCode, message string, details ...any) *echo.HTTPError {
 	return NewErrorResponse(http.StatusBadRequest, appErrCode, message, details...)
 }
 
-func (h *responseHandler) InternalServerError(appErrCode errors.ErrorCode, message string, details ...any) *echo.HTTPError {
-	return NewErrorResponse(http.StatusInternalServerError, appErrCode, message, details...)
-}
-
-func (h *responseHandler) NotFound(appErrCode errors.ErrorCode, message string, details ...any) *echo.HTTPError {
+func (h *baseHandler) NotFound(appErrCode apperrors.ErrorCode, message string, details ...any) *echo.HTTPError {
 	return NewErrorResponse(http.StatusNotFound, appErrCode, message, details...)
 }
 
-func (h *responseHandler) Unauthorized(appErrCode errors.ErrorCode, message string, details ...any) *echo.HTTPError {
-	return NewErrorResponse(http.StatusUnauthorized, appErrCode, message, details...)
-}
-
-func (h *responseHandler) Forbidden(appErrCode errors.ErrorCode, message string, details ...any) *echo.HTTPError {
-	return NewErrorResponse(http.StatusForbidden, appErrCode, message, details...)
-}
-
-func (h *responseHandler) ValidationError(appErrCode errors.ErrorCode, message string, details ...any) *echo.HTTPError {
-	return NewErrorResponse(http.StatusBadRequest, appErrCode, message, details...)
-}
-
-func (h *responseHandler) SuccessResponse(c echo.Context, data any, message string) error {
-	return c.JSON(http.StatusOK, NewSuccessResponse(http.StatusOK, data, message))
-}
-
-func (h *responseHandler) ErrorResponse(c echo.Context, err error) error {
-	return c.JSON(http.StatusInternalServerError, NewErrorResponse(http.StatusInternalServerError, errors.ErrInternalServer, err.Error()))
+func (h *baseHandler) InternalServerError(appErrCode apperrors.ErrorCode, message string, details ...any) *echo.HTTPError {
+	return NewErrorResponse(http.StatusInternalServerError, appErrCode, message, details...)
 }

@@ -1,6 +1,6 @@
 package utils
 
-import "go-api-starter/core/constants"
+import "go-api-starter/pkg/constants"
 
 // GenerateRolePermissionsKey tạo Redis key cho permissions của role
 func GenerateRolePermissionsKey(roleSlug string) string {

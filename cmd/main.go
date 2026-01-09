@@ -1,22 +1,25 @@
 package main
 
 import (
-	"fmt"
+	"go-api-starter/modules/auth"
+	"go-api-starter/pkg"
+	"go-api-starter/pkg/cli"
+	"go-api-starter/pkg/config"
+	"go-api-starter/pkg/server"
+
 	"github.com/rs/zerolog"
 	"github.com/samber/do/v2"
-	"go-api-starter/core/cli"
-	"go-api-starter/core/config"
-	"go-api-starter/core/http"
 )
 
 func main() {
-	// Initialize the dependency injection injector
-	// This is the core component of the samber/do library that manages all services
-	injector := do.New(
-		http.Package,
-	)
 
-	// Get services from dependency injection container
+	injector := do.New(
+		pkg.BasePackage,
+		server.Package,
+		auth.Package,
+	)
+	defer injector.Shutdown()
+
 	appConfig := do.MustInvoke[*config.Config](injector)
 	appLogger := do.MustInvoke[*zerolog.Logger](injector)
 	cliService := do.MustInvoke[*cli.CLI](injector)
@@ -25,11 +28,10 @@ func main() {
 	appLogger.Info().Str("app_name", appConfig.App.Name).
 		Str("version", appConfig.App.Version).
 		Str("environment", appConfig.App.Environment).
-		Msg(fmt.Sprintf("Starting %s application", appConfig.App.Name))
+		Msg("Starting AnawimEnglish application")
 
 	// Execute the CLI - this will handle all command parsing and execution
 	if err := cliService.Execute(); err != nil {
+		appLogger.Fatal().Err(err).Msg("Failed to execute API")
 	}
-
-	_, _ = injector.ShutdownOnSignals()
 }
