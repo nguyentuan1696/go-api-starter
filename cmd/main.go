@@ -28,7 +28,7 @@ func main() {
 	appLogger.Info().Str("app_name", appConfig.App.Name).
 		Str("version", appConfig.App.Version).
 		Str("environment", appConfig.App.Environment).
-		Msg("Starting AnawimEnglish application")
+		Msg("Starting GoAPIStarter application")
 
 	// Execute the CLI - this will handle all command parsing and execution
 	if err := cliService.Execute(); err != nil {

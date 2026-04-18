@@ -36,4 +36,4 @@ COPY --from=builder /app/anawim-backend .
 EXPOSE 8080
 
 # Command to run the application
-CMD ["./anawim-backend", "serve"]
+CMD ["./goapistarter-backend", "serve"]
